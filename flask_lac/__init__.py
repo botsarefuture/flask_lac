@@ -1,7 +1,7 @@
 from flask import session, request, redirect, url_for, render_template, g, has_request_context
 import requests
 from werkzeug.local import LocalProxy
-from flask_auth.user import User
+from flask_lac.user import User
 from functools import wraps
 
 
