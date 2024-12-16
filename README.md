@@ -1,7 +1,13 @@
 # Flask LAC
 
-A simple authentication package for Flask applications.
+Flask LAC is a authentication package for Flask applications.
 
+> [!NOTE] This package requires a running instance of the [authentication service](https://auth.luova.club).
+
+## Features
+
+
+This
 ## Installation
 
 To install the package, use pip:
