@@ -21,6 +21,7 @@ def _get_user():
     return None
 
 user = LocalProxy(lambda: _get_user())
+current_user = user
 
 class AuthPackage:
     def __init__(self, app=None, auth_service_url="https://auth.luova.club", app_id=None):
@@ -66,12 +67,15 @@ class AuthPackage:
         """
         Initialize the before request handler.
         """
-        @self._app.before_request
-        def before_request():
-            """
-            Before each request, initialize the user.
-            """
-            self._user = User()
+        #@self._app.before_request
+        #def before_request():
+        #    """
+        #    Before each request, initialize the user.
+        #    """
+        #    self._user = User()
+        @self._app.context_processor
+        def inject_user():
+            return dict(current_user=user)
     
     def _init_routes(self):
         """
@@ -119,7 +123,12 @@ class AuthPackage:
                 session["expiry"] = expiry
 
             session['token'] = token
+            session['logged_in'] = True
             session["modified"] = True
+            if session.get('next'):
+                return redirect(session.get('next'))
+            else:
+                return redirect("/")
             return redirect(session.get('next', '/'))
                 
             return "Authentication callback successful!"
@@ -139,6 +148,50 @@ class AuthPackage:
             session.modified = True
             next = url_for('auth_callback', _external=True)
             return redirect(f"{self._auth_service_url}/authorize?app_id={self._app_id}&next={next}&scope=login")
+
+        @self._app.route('/logout')
+        def logout():
+            """
+            Logout route that clears the session.
+
+            Returns
+            -------
+            Response
+                Redirects to the index route.
+            """
+            try:
+                # Attempt to log out from the authentication service
+                token = session.get('token')
+                if token:
+                    response = requests.post(f"{self._auth_service_url}/logout", json={"token": token})
+                    response.raise_for_status()  # Ensure the request was successful
+
+                # Clear session data
+                session.clear()
+
+                # Reset current_user attributes
+                current_user._authenticated = False
+                current_user._token = None
+                current_user._expiry = None
+                current_user._info = None
+                
+                session["token"] = None
+                session["logged_in"] = False
+                session["modified"] = True
+            
+
+                # Debugging: Print current_user state
+                print(f"User after logout: {current_user}")
+
+            except requests.exceptions.RequestException as e:
+                # Log error for debugging if the request fails
+                print(f"Error logging out: {e}")
+
+            except AttributeError as e:
+                # Handle cases where current_user is not properly set
+                print(f"Error resetting current_user: {e}")
+
+            return redirect(url_for('index'))
 
 
 def login_required(f):

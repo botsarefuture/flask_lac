@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: flask_lac
-Version: 0.4.0
+Version: 0.5.0
 Summary: A simple authentication package for Flask applications
 Home-page: https://github.com/botsarefuture/flask_lac
 Author: Verso Vuorenmaa
@@ -16,8 +16,14 @@ Requires-Dist: Werkzeug>=1.0.1
 
 # Flask LAC
 
-A simple authentication package for Flask applications.
+Flask LAC is a authentication package for Flask applications.
 
+> [!NOTE] This package requires a running instance of the [authentication service](https://auth.luova.club).
+
+## Features
+
+
+This
 ## Installation
 
 To install the package, use pip:
