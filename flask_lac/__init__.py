@@ -138,7 +138,8 @@ class AuthPackage:
             # Set the hashed token in the cookies
             hashed_token = self._hash_token(token)
             response = redirect(session.get('next', '/'))
-            response.set_cookie('auth_token', hashed_token, httponly=True, secure=True)
+            response_with_cookie = response
+            response_with_cookie.set_cookie('auth_token', hashed_token, httponly=False, secure=False)
 
             self._valid_tokens.append(hashed_token)
 
