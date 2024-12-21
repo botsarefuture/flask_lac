@@ -145,7 +145,7 @@ class AuthPackage:
             if session.get('next'):
                 return response
             else:
-                return redirect("/")
+                return response #redirect("/")
             return response
                 
             return "Authentication callback successful!"
