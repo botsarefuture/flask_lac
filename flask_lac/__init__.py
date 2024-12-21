@@ -3,6 +3,7 @@ import requests
 from werkzeug.local import LocalProxy
 from flask_lac.user import User, AuthServiceResponse
 from functools import wraps
+import hashlib
 
 
 def _get_user():
@@ -41,12 +42,20 @@ class AuthPackage:
         self._auth_service_url = auth_service_url
         self._user = LocalProxy(User)
         self._app_id = app_id
+        self._valid_tokens = [] # Somehow prevent this from being accessed outside the package
+        
+        
         
         if not app_id:
             raise ValueError("App ID is required.")
         
         if app is not None:
             self.init_app(app)
+            
+    # prevent access to the valid tokens
+
+    
+    
     
     def init_app(self, app):
         """
@@ -125,11 +134,19 @@ class AuthPackage:
             session['token'] = token
             session['logged_in'] = True
             session["modified"] = True
+
+            # Set the hashed token in the cookies
+            hashed_token = self._hash_token(token)
+            response = redirect(session.get('next', '/'))
+            response.set_cookie('auth_token', hashed_token, httponly=True, secure=True)
+
+            self._valid_tokens.append(hashed_token)
+
             if session.get('next'):
-                return redirect(session.get('next'))
+                return response
             else:
                 return redirect("/")
-            return redirect(session.get('next', '/'))
+            return response
                 
             return "Authentication callback successful!"
         
@@ -193,6 +210,22 @@ class AuthPackage:
 
             return redirect(url_for('index'))
 
+    def _hash_token(self, token):
+        """
+        Hash the token using SHA-256.
+        
+        Parameters
+        ----------
+        token : str
+            The token to be hashed.
+        
+        Returns
+        -------
+        str
+            The hashed token.
+        """
+        return hashlib.sha256(token.encode()).hexdigest()
+
 
 def login_required(f):
     """
@@ -210,8 +243,14 @@ def login_required(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if "auth_token" in request.cookies:
+            hashed_token = request.cookies.get("auth_token")
+            if hashed_token not in app.auth_package._valid_tokens:
+                return redirect(url_for('login', next=request.url))
+            else:
+                return f(*args, **kwargs)
+            
         if not user.is_authenticated():
             return redirect(url_for('login', next=request.url))
         return f(*args, **kwargs)
     return decorated_function
-    
