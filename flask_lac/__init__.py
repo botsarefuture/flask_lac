@@ -1,4 +1,4 @@
-from flask import session, request, redirect, url_for, render_template, g, has_request_context
+from flask import session, request, redirect, url_for, render_template, g, has_request_context, current_app
 import requests
 from werkzeug.local import LocalProxy
 from flask_lac.user import User, AuthServiceResponse
@@ -146,6 +146,7 @@ class AuthPackage:
                 return response
             else:
                 return response #redirect("/")
+            
             return response
                 
             return "Authentication callback successful!"
@@ -245,7 +246,7 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if "auth_token" in request.cookies:
             hashed_token = request.cookies.get("auth_token")
-            if hashed_token not in app.auth_package._valid_tokens:
+            if hashed_token not in current_app.auth_package._valid_tokens:
                 return redirect(url_for('login', next=request.url))
             else:
                 return f(*args, **kwargs)
