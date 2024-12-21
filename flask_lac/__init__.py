@@ -7,7 +7,16 @@ import hashlib
 import os
 import logging
 import sys
+import redis
 
+# Initialize Redis client
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+
+# check if we have redis running, otherwise use a list
+try:
+    redis_client.ping()
+except redis.exceptions.ConnectionError:
+    redis_client = []
 
 def _get_user():
     """
@@ -64,12 +73,27 @@ class AuthPackage:
 
     @property
     def _valid_tokens(self):
-        return valid_tokens
+        """
+        Get the valid tokens from Redis.
+        
+        Returns
+        -------
+        list
+            The list of valid tokens.
+        """
+        return redis_client.lrange('valid_tokens', 0, -1)
     
     @_valid_tokens.setter
     def _valid_tokens(self, value):
-        global valid_tokens
-        valid_tokens.append(value)
+        """
+        Add a new valid token to Redis.
+        
+        Parameters
+        ----------
+        value : str
+            The token to be added.
+        """
+        redis_client.rpush('valid_tokens', value)
     
     
     def init_app(self, app):
@@ -168,7 +192,7 @@ class AuthPackage:
             response_with_cookie.set_cookie('auth_token', hashed_token, httponly=False, secure=False)
             
             global valid_tokens
-            valid_tokens.append(hashed_token)
+            self._valid_tokens = hashed_token
 
             if os.getenv('DEBUG') == 'true':
                 self._logger.info(f"User authenticated, redirecting to: {session.get('next', '/')}")
@@ -284,7 +308,7 @@ def login_required(f):
         sys.stdout.flush()
         if "auth_token" in request.cookies:
             hashed_token = request.cookies.get("auth_token")
-            global valid_tokens
+            valid_tokens = redis_client.lrange('valid_tokens', 0, -1)
             if hashed_token not in valid_tokens:
                 if os.getenv('DEBUG') == 'true':
                     logging.info(f"Invalid token, redirecting to login")
