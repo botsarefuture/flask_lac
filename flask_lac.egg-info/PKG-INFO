@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: flask_lac
-Version: 0.8.4
+Version: 0.8.5
 Summary: A simple authentication package for Flask applications
 Home-page: https://github.com/botsarefuture/flask_lac
 Author: Verso Vuorenmaa

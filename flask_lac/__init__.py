@@ -49,7 +49,7 @@ class AuthPackage:
         self._app_id = app_id
         self._logger = logging.getLogger(__name__)
         if os.getenv('DEBUG') == 'true':
-            logging.basicConfig(level=logging.INFO)
+            logging.basicConfig(level=logging.WARNING)
         
         
         
@@ -165,15 +165,16 @@ class AuthPackage:
             response = redirect(session.get('next', '/'))
             response_with_cookie = response
             response_with_cookie.set_cookie('auth_token', hashed_token, httponly=False, secure=False)
-
-            self._valid_tokens = hashed_token
+            
+            global valid_tokens
+            valid_tokens.append(hashed_token)
 
             if os.getenv('DEBUG') == 'true':
                 self._logger.info(f"User authenticated, redirecting to: {session.get('next', '/')}")
             if session.get('next'):
-                return response
+                return response_with_cookie
             else:
-                return response #redirect("/")
+                return response_with_cookie #redirect("/")
             
             return response
                 
