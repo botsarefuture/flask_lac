@@ -14,9 +14,9 @@ rm -rf dist
 python3 setup.py sdist bdist_wheel
 
 # Upload the package to PyPI
-twine upload dist/*
+#twine upload dist/*
 
 # Clean up
-rm -rf dist build *.egg-info
+#rm -rf dist build *.egg-info
 
 echo "Package updated and uploaded successfully."
