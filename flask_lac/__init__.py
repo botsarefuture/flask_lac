@@ -284,6 +284,7 @@ def login_required(f):
         sys.stdout.flush()
         if "auth_token" in request.cookies:
             hashed_token = request.cookies.get("auth_token")
+            global valid_tokens
             if hashed_token not in valid_tokens:
                 if os.getenv('DEBUG') == 'true':
                     logging.info(f"Invalid token, redirecting to login")
