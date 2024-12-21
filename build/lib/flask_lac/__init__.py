@@ -24,6 +24,9 @@ def _get_user():
 user = LocalProxy(lambda: _get_user())
 current_user = user
 
+global valid_tokens
+valid_tokens = []
+
 class AuthPackage:
     def __init__(self, app=None, auth_service_url="https://auth.luova.club", app_id=None):
         """
@@ -42,7 +45,6 @@ class AuthPackage:
         self._auth_service_url = auth_service_url
         self._user = LocalProxy(User)
         self._app_id = app_id
-        self._valid_tokens = [] # Somehow prevent this from being accessed outside the package
         
         
         
@@ -54,7 +56,14 @@ class AuthPackage:
             
     # prevent access to the valid tokens
 
+    @property
+    def _valid_tokens(self):
+        return valid_tokens
     
+    @_valid_tokens.setter
+    def _valid_tokens(self, value):
+        global valid_tokens
+        valid_tokens.append(value)
     
     
     def init_app(self, app):
@@ -141,7 +150,7 @@ class AuthPackage:
             response_with_cookie = response
             response_with_cookie.set_cookie('auth_token', hashed_token, httponly=False, secure=False)
 
-            self._valid_tokens.append(hashed_token)
+            self._valid_tokens = hashed_token
 
             if session.get('next'):
                 return response
@@ -247,7 +256,7 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if "auth_token" in request.cookies:
             hashed_token = request.cookies.get("auth_token")
-            if hashed_token not in current_app.auth_package._valid_tokens:
+            if hashed_token not in valid_tokens:
                 return redirect(url_for('login', next=request.url))
             else:
                 return f(*args, **kwargs)
