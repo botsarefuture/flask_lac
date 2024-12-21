@@ -6,6 +6,7 @@ from functools import wraps
 import hashlib
 import os
 import logging
+import sys
 
 
 def _get_user():
@@ -278,6 +279,9 @@ def login_required(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        print(request.cookies)
+        # somehow force gunicorn to show this
+        sys.stdout.flush()
         if "auth_token" in request.cookies:
             hashed_token = request.cookies.get("auth_token")
             if hashed_token not in valid_tokens:
