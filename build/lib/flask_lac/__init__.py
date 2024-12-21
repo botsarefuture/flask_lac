@@ -285,11 +285,19 @@ def login_required(f):
         if "auth_token" in request.cookies:
             hashed_token = request.cookies.get("auth_token")
             if hashed_token not in valid_tokens:
+                if os.getenv('DEBUG') == 'true':
+                    logging.info(f"Invalid token, redirecting to login")
+                    
                 return redirect(url_for('login', next=request.url))
             else:
+                if os.getenv('DEBUG') == 'true':
+                    logging.info(f"Accessing route: {f.__name__}, token valid")
                 return f(*args, **kwargs)
             
         if not user.is_authenticated():
+            if os.getenv('DEBUG') == 'true':
+                logging.info(f"User not authenticated, redirecting to login")
+                
             return redirect(url_for('login', next=request.url))
         if os.getenv('DEBUG') == 'true':
             logging.info(f"Accessing route: {f.__name__}, user authenticated: {user.is_authenticated()}")
