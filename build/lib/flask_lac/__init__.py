@@ -287,19 +287,27 @@ def login_required(f):
             if hashed_token not in valid_tokens:
                 if os.getenv('DEBUG') == 'true':
                     logging.info(f"Invalid token, redirecting to login")
+                    sys.stdout.flush()
+
                     
                 return redirect(url_for('login', next=request.url))
             else:
                 if os.getenv('DEBUG') == 'true':
                     logging.info(f"Accessing route: {f.__name__}, token valid")
+                    sys.stdout.flush()
+
                 return f(*args, **kwargs)
             
         if not user.is_authenticated():
             if os.getenv('DEBUG') == 'true':
-                logging.info(f"User not authenticated, redirecting to login")
+                logging.info(f"User not authenticated, redirecting to login") #       sys.stdout.flush()
+                sys.stdout.flush()
+
                 
             return redirect(url_for('login', next=request.url))
         if os.getenv('DEBUG') == 'true':
             logging.info(f"Accessing route: {f.__name__}, user authenticated: {user.is_authenticated()}")
+            sys.stdout.flush()
+
         return f(*args, **kwargs)
     return decorated_function
