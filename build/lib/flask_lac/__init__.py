@@ -4,6 +4,8 @@ from werkzeug.local import LocalProxy
 from flask_lac.user import User, AuthServiceResponse
 from functools import wraps
 import hashlib
+import os
+import logging
 
 
 def _get_user():
@@ -45,6 +47,9 @@ class AuthPackage:
         self._auth_service_url = auth_service_url
         self._user = LocalProxy(User)
         self._app_id = app_id
+        self._logger = logging.getLogger(__name__)
+        if os.getenv('DEBUG') == 'true':
+            logging.basicConfig(level=logging.INFO)
         
         
         
@@ -80,6 +85,8 @@ class AuthPackage:
         self._add_secured_route = False
         self._init_before_request()
         self._init_routes()
+        if os.getenv('DEBUG') == 'true':
+            self._logger.info("App initialized with AuthPackage")
     
     def _init_before_request(self):
         """
@@ -94,6 +101,8 @@ class AuthPackage:
         @self._app.context_processor
         def inject_user():
             return dict(current_user=user)
+        if os.getenv('DEBUG') == 'true':
+            self._logger.info("Before request handler initialized")
     
     def _init_routes(self):
         """
@@ -114,6 +123,9 @@ class AuthPackage:
                     return redirect(url_for('login', next=request.url))
                 return render_template('secured.html', username=self._user._info.username)
         
+        if os.getenv('DEBUG') == 'true':
+            self._logger.info("Routes initialized")
+
         @self._app.route("/auth_callback")
         def auth_callback():
             """
@@ -125,6 +137,8 @@ class AuthPackage:
                 Authentication callback message.
             """
             token = request.args.get('token')
+            if os.getenv('DEBUG') == 'true':
+                self._logger.info(f"Auth callback called with token: {token}")
             # Verify the token with the authentication service
             response = requests.post(f"{self._auth_service_url}/verify", json={"token": token})
             try:
@@ -135,6 +149,8 @@ class AuthPackage:
                 return "Invalid token"
             
             expiry = auth_response.json.get('expiry')
+            if os.getenv('DEBUG') == 'true':
+                self._logger.info(f"Token verified, expiry: {expiry}")
             print(expiry)
             if expiry:
                 session.permanent = True
@@ -152,6 +168,8 @@ class AuthPackage:
 
             self._valid_tokens = hashed_token
 
+            if os.getenv('DEBUG') == 'true':
+                self._logger.info(f"User authenticated, redirecting to: {session.get('next', '/')}")
             if session.get('next'):
                 return response
             else:
@@ -175,6 +193,8 @@ class AuthPackage:
             session['next'] = _next
             session.modified = True
             next = url_for('auth_callback', _external=True)
+            if os.getenv('DEBUG') == 'true':
+                self._logger.info(f"Login route called, redirecting to: {self._auth_service_url}/authorize")
             return redirect(f"{self._auth_service_url}/authorize?app_id={self._app_id}&next={next}&scope=login")
 
         @self._app.route('/logout')
@@ -209,7 +229,8 @@ class AuthPackage:
             
 
                 # Debugging: Print current_user state
-                print(f"User after logout: {current_user}")
+                if os.getenv('DEBUG') == 'true':
+                    self._logger.info(f"User after logout: {current_user}")
 
             except requests.exceptions.RequestException as e:
                 # Log error for debugging if the request fails
@@ -219,6 +240,8 @@ class AuthPackage:
                 # Handle cases where current_user is not properly set
                 print(f"Error resetting current_user: {e}")
 
+            if os.getenv('DEBUG') == 'true':
+                self._logger.info("Logout route called")
             return redirect(url_for('index'))
 
     def _hash_token(self, token):
@@ -263,5 +286,7 @@ def login_required(f):
             
         if not user.is_authenticated():
             return redirect(url_for('login', next=request.url))
+        if os.getenv('DEBUG') == 'true':
+            logging.info(f"Accessing route: {f.__name__}, user authenticated: {user.is_authenticated()}")
         return f(*args, **kwargs)
     return decorated_function

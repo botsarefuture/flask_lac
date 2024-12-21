@@ -5,11 +5,14 @@ from flask import session, request, redirect, url_for, abort, current_app, has_r
 import logging
 from dateutil.parser import isoparse  # Requires `python-dateutil`
 from datetime import datetime
+import os
 
 # Define the URL for the authentication service
 AUTH_SERVICE_URL = "https://auth.luova.club"
 
 logger = logging.getLogger(__name__)
+if os.getenv('DEBUG') == 'true':
+    logging.basicConfig(level=logging.INFO)
 
 class AuthServiceResponse:
     def __init__(self, response, hard_fail=False):
@@ -41,6 +44,9 @@ class AuthServiceResponse:
                 raise Exception(f"An error occurred: {self.message}")
             else:
                 logger.error(f"An error occurred: {self.message}")
+        
+        if os.getenv('DEBUG') == 'true':
+            logger.info(f"AuthServiceResponse initialized with response: {response}")
         
     @property
     def status_code(self):
@@ -117,6 +123,9 @@ class LongToken:
         """
         self._token = token
         self._expiry = expiry
+        
+        if os.getenv('DEBUG') == 'true':
+            logger.info(f"LongToken initialized with token: {token}, expiry: {expiry}")
         
     @property
     def token(self):
@@ -202,6 +211,9 @@ def role_required(min_role):
             else:
                 abort(403, description="You do not have permission to access this resource. Level required: " + str(min_role) + "." + " Your role: " + str(user.role)) 
                 return redirect(url_for('login', next=request.url))  # Redirect to login if not authorized
+            
+            if os.getenv('DEBUG') == 'true':
+                logger.info(f"Checking role for user: {user.role}, required: {min_role}")
         return wrapper
     return decorator
 
@@ -244,6 +256,9 @@ class User:
             self._authenticated = True
             self._get_info()
             
+        if os.getenv('DEBUG') == 'true':
+            logger.info("User instance initialized")
+            
     def __repr__(self):
         """
         Get the string representation of the User instance.
@@ -270,6 +285,9 @@ class User:
         except requests.RequestException as e:
             logger.error(f"Failed to retrieve user info: {e}")
             self._info = None
+        
+        if os.getenv('DEBUG') == 'true':
+            logger.info("Retrieving user information")
     
     def get_long_token(self):
         """
@@ -295,6 +313,9 @@ class User:
         except requests.RequestException as e:
             logger.error(f"Failed to retrieve long token: {e}")
             return None
+        
+        if os.getenv('DEBUG') == 'true':
+            logger.info("Getting long token")
     
     @property
     def username(self):
@@ -433,6 +454,10 @@ class User:
                 
             if session["logged_in"] == False:
                 return False
+        
+        if os.getenv('DEBUG') == 'true':
+            logger.info(f"User authenticated: {self._authenticated}")
+            
         return self._authenticated
 
     def __call__(self):
