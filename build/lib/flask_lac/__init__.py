@@ -9,14 +9,19 @@ import logging
 import sys
 import redis
 
-# Initialize Redis client
-redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+global enable_redis
+enable_redis = True
 
-# check if we have redis running, otherwise use a list
-try:
-    redis_client.ping()
-except redis.exceptions.ConnectionError:
-    redis_client = []
+if enable_redis:
+    # Initialize Redis client
+    redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+
+    # check if we have redis running, otherwise use a list
+    try:
+        redis_client.ping()
+    except redis.exceptions.ConnectionError:
+        enable_redis = False
+        redis_client = None
 
 def _get_user():
     """
@@ -81,6 +86,8 @@ class AuthPackage:
         list
             The list of valid tokens.
         """
+        if not enable_redis:
+            return valid_tokens
         return redis_client.lrange('valid_tokens', 0, -1)
     
     @_valid_tokens.setter
@@ -93,6 +100,10 @@ class AuthPackage:
         value : str
             The token to be added.
         """
+        if not enable_redis:
+            logging.warning("Redis is not enabled, using list. This is not recommended for production.")
+            valid_tokens.append(value)
+            return
         redis_client.rpush('valid_tokens', value)
     
     
@@ -308,20 +319,31 @@ def login_required(f):
         sys.stdout.flush()
         if "auth_token" in request.cookies:
             hashed_token = request.cookies.get("auth_token")
-            valid_tokens = redis_client.lrange('valid_tokens', 0, -1)
-            if hashed_token not in valid_tokens:
-                if os.getenv('DEBUG') == 'true':
-                    logging.info(f"Invalid token, redirecting to login")
-                    sys.stdout.flush()
-
-                    
-                return redirect(url_for('login', next=request.url))
+            if not enable_redis:
+                global valid_tokens
+                if hashed_token not in valid_tokens:
+                    if os.getenv('DEBUG') == 'true':
+                        logging.info(f"Invalid token, redirecting to login")
+                        sys.stdout.flush()
+                    return redirect(url_for('login', next=request.url))
+                
+                else:
+                    if os.getenv('DEBUG') == 'true':
+                        logging.info(f"Accessing route: {f.__name__}, token valid")
+                        sys.stdout.flush()
+                    return f(*args, **kwargs)
             else:
-                if os.getenv('DEBUG') == 'true':
-                    logging.info(f"Accessing route: {f.__name__}, token valid")
-                    sys.stdout.flush()
-
-                return f(*args, **kwargs)
+                valid_tokens = redis_client.lrange('valid_tokens', 0, -1)
+                if hashed_token not in valid_tokens:
+                    if os.getenv('DEBUG') == 'true':
+                        logging.info(f"Invalid token, redirecting to login")
+                        sys.stdout.flush()
+                    return redirect(url_for('login', next=request.url))
+                else:
+                    if os.getenv('DEBUG') == 'true':
+                        logging.info(f"Accessing route: {f.__name__}, token valid")
+                        sys.stdout.flush()
+                    return f(*args, **kwargs)
             
         if not user.is_authenticated():
             if os.getenv('DEBUG') == 'true':

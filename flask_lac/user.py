@@ -5,7 +5,9 @@ from flask import session, request, redirect, url_for, abort, current_app, has_r
 import logging
 from dateutil.parser import isoparse  # Requires `python-dateutil`
 from datetime import datetime
+import time
 import os
+import threading
 
 # Define the URL for the authentication service
 AUTH_SERVICE_URL = "https://auth.luova.club"
@@ -232,6 +234,7 @@ class User:
         if 'token' in session:
             self._token = session.get('token')
             _go_on = True
+            
         else:
             _go_on = False
             self._authenticated = False
@@ -255,6 +258,7 @@ class User:
         if _go_on:
             self._authenticated = True
             self._get_info()
+            self._start_token_verification()
             
         if os.getenv('DEBUG') == 'true':
             logger.info("User instance initialized")
@@ -282,6 +286,7 @@ class User:
                 self._info = auth_response.json["user_info"]
             else:
                 self._info = None
+                
         except requests.RequestException as e:
             logger.error(f"Failed to retrieve user info: {e}")
             self._info = None
@@ -481,6 +486,40 @@ class User:
             The string representation of the User instance.
         """
         return f"User(username={self.username}, email={self.email}, role={self.role}, permissions={self.permissions})"
+        
+    def _verify_token(self):
+        """
+        Verify if the token is still active by calling the verify route.
+        """
+        try:
+            response = requests.post(f"{AUTH_SERVICE_URL}/verify", json={"token": self._token})
+            response.raise_for_status()
+            auth_response = AuthServiceResponse(response, hard_fail=False)
+            if auth_response.status_machine != 'OK':
+                self._authenticated = False
+                session['logged_in'] = False
+                redirect(url_for('login', next=request.url))
+        except requests.RequestException as e:
+            logger.error(f"Failed to verify token: {e}")
+            self._authenticated = False
+            session['logged_in'] = False
+            redirect(url_for('login', next=request.url))
+        
+        if os.getenv('DEBUG') == 'true':
+            logger.info("Token verification completed")
+
+    def _start_token_verification(self):
+        """
+        Start a thread to verify the token every 5 minutes.
+        """
+        def verify_periodically():
+            while self._authenticated:
+                self._verify_token()
+                time.sleep(300)  # Sleep for 5 minutes
+
+        verification_thread = threading.Thread(target=verify_periodically)
+        verification_thread.daemon = True
+        verification_thread.start()
         
         
 class UserNotImplementedYet:
