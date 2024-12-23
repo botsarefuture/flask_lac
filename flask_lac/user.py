@@ -194,7 +194,7 @@ class LongToken:
         return {"token": self._token, "expiry": self._expiry}
 
 
-def role_required(min_role):
+def role_required(min_role, redirect_to=None):
     """
     Decorator to check if the user has at least the required role.
 
@@ -219,6 +219,9 @@ def role_required(min_role):
             if user.role is not None and int(user.role) >= min_role:
                 return func(*args, **kwargs)
             else:
+                if redirect_to is not None:
+                    return redirect(url_for(redirect_to))
+                
                 abort(
                     403,
                     description="You do not have permission to access this resource. Level required: "
@@ -227,6 +230,7 @@ def role_required(min_role):
                     + " Your role: "
                     + str(user.role),
                 )
+                
                 return redirect(
                     url_for("login", next=request.url)
                 )  # Redirect to login if not authorized
