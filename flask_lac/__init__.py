@@ -292,7 +292,7 @@ class AuthPackage:
         @self._app.route("/logout")
         def logout():
             """
-            Logout route that clears the session.
+            Logout route that clears the session, removes all authentication cookies, and invalidates the token in Redis.
 
             Returns
             -------
@@ -303,12 +303,27 @@ class AuthPackage:
                 # Attempt to log out from the authentication service
                 token = session.get("token")
                 if token:
-                    current_user._stop_token_verification.set() # Fixed a bug where the token verification thread would keep running after logout
-                    
+                    current_user._stop_token_verification.set()
                     response = requests.post(
                         f"{self._auth_service_url}/logout", json={"token": token}
                     )
-                    response.raise_for_status()  # Ensure the request was successful
+                    response.raise_for_status()
+
+                    # Invalidate the token in Redis or in-memory list
+                    hashed_token = self._hash_token(token)
+                    if enable_redis:
+                        try:
+                            redis_client.lrem("valid_tokens", 0, hashed_token)
+                        except Exception as e:
+                            if os.getenv("DEBUG") == "true":
+                                self._logger.warning(f"Failed to remove token from Redis: {e}")
+                    else:
+                        try:
+                            while hashed_token in valid_tokens:
+                                valid_tokens.remove(hashed_token)
+                        except Exception as e:
+                            if os.getenv("DEBUG") == "true":
+                                self._logger.warning(f"Failed to remove token from memory: {e}")
 
                 # Clear session data
                 session.clear()
@@ -323,24 +338,21 @@ class AuthPackage:
                 session["logged_in"] = False
                 session["modified"] = True
 
-                # Debugging: Print current_user state
                 if os.getenv("DEBUG") == "true":
                     self._logger.info(f"User after logout: {current_user}")
 
             except requests.exceptions.RequestException as e:
-                # Log error for debugging if the request fails
                 print(f"Error logging out: {e}")
-
             except AttributeError as e:
-                # Handle cases where current_user is not properly set
                 print(f"Error resetting current_user: {e}")
 
             if os.getenv("DEBUG") == "true":
                 self._logger.info("Logout route called")
-                
+
             next_url = session.get("next", url_for("index"))
-            return redirect(next_url)
-        
+            response = redirect(next_url)
+            response.set_cookie("auth_token", "", expires=0)
+            return response
 
 
     def _hash_token(self, token):
@@ -402,5 +414,6 @@ def login_required(f):
         if os.getenv("DEBUG") == "true":
             logging.info(f"Access granted to {f.__name__} with valid auth token")
         return f(*args, **kwargs)
+    decorated_function._login_required = True
     return decorated_function
 

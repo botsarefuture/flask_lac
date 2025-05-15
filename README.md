@@ -133,7 +133,9 @@ This will bump the version, build, and upload to PyPI.
 ## Troubleshooting & FAQ
 
 - **Redis is not running:** The package will fall back to in-memory token storage, which is not recommended for production.
+
 - **How do I get my app_id?** Register on the authentication service and create a new application.
+
 - **How do I add permissions or roles?** Use the admin interface of the authentication service.
 
 ## License
