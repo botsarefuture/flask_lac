@@ -362,32 +362,45 @@ class AuthPackage:
 
 def login_required(f):
     """
-    Decorator that enforces authentication by requiring a valid 'auth_token' cookie.
-    If the token is missing or invalid, the request is redirected to the login route.
+    Decorator that enforces authentication by requiring a valid 'auth_token' cookie or a valid session token.
+    If neither is present or valid, the request is redirected to the login route.
+
+    Parameters
+    ----------
+    f : callable
+        The view function to decorate.
+
+    Returns
+    -------
+    callable
+        The wrapped function that enforces authentication.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Retrieve the hashed token from the request cookies
         hashed_token = request.cookies.get("auth_token")
-        if not hashed_token:
-            if os.getenv("DEBUG") == "true":
-                logging.info("No auth token found in cookies; redirecting to login")
-            return redirect(url_for("login", next=request.url))
-        
-        # Get the list of valid tokens (from Redis if enabled, otherwise use the fallback list)
         tokens = redis_client.lrange("valid_tokens", 0, -1) if enable_redis else valid_tokens
-
-        # If the token is not valid, redirect to the login page
-        if hashed_token not in tokens:
+        # If cookie token is missing or invalid, check session token
+        if not hashed_token or hashed_token not in tokens:
+            session_token = session.get("token")
+            if session_token:
+                import hashlib
+                session_hashed_token = hashlib.sha256(session_token.encode()).hexdigest()
+                if session_hashed_token in tokens:
+                    # Set the cookie for future requests
+                    response = f(*args, **kwargs)
+                    response = response if hasattr(response, 'set_cookie') else response
+                    try:
+                        response.set_cookie("auth_token", session_hashed_token, httponly=False, secure=False)
+                    except Exception:
+                        pass  # If response is not a Response object, skip setting cookie
+                    if os.getenv("DEBUG") == "true":
+                        logging.info(f"Access granted to {f.__name__} with valid session token; cookie set.")
+                    return response
             if os.getenv("DEBUG") == "true":
-                logging.info("Invalid auth token; redirecting to login")
+                logging.info("Missing or invalid auth token; redirecting to login")
             return redirect(url_for("login", next=request.url))
-        
         if os.getenv("DEBUG") == "true":
             logging.info(f"Access granted to {f.__name__} with valid auth token")
-        
-        # Proceed to the protected route
         return f(*args, **kwargs)
-    
     return decorated_function
 

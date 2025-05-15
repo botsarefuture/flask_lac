@@ -1,26 +1,32 @@
 # Flask LAC
 
-Flask LAC is a authentication package for Flask applications.
+Flask LAC is an authentication package for Flask applications, providing seamless integration with an external authentication service.
 
-> [!NOTE] This package requires a running instance of the [authentication service](https://auth.luova.club).
+> **Note:** This package requires a running instance of the [authentication service](https://auth.luova.club).
 
 ## Features
 
+- User authentication via external service
+- Session and cookie-based authentication
+- Role-based access control (`role_required` decorator)
+- Permission-based access control (`permission_needed` decorator)
+- Automatic token verification and renewal
+- Easy integration with Flask apps
+- Redis support for token storage (fallback to in-memory for development)
+- Secure login and logout routes
+- User info and permissions retrieval
 
-This
 ## Installation
 
-To install the package, use pip:
+Install the package using pip:
 
 ```sh
 pip install flask-lac
 ```
 
-## Usage
+## Quick Start
 
 ### Initialization
-
-First, initialize the `AuthPackage` with your Flask app:
 
 ```python
 from flask import Flask
@@ -30,66 +36,106 @@ app = Flask(__name__)
 auth = AuthPackage(app, auth_service_url="https://auth.luova.club", app_id="your_app_id")
 ```
 
-> [!IMPORTANT] To get your `app_id`, register as a user on the authentication service and create a new application.
+> **Important:** To get your `app_id`, register as a user on the authentication service and create a new application.
 
-### Routes
-
-The package provides several routes for authentication:
+### Provided Routes
 
 - `/login`: Redirects to the external authentication service.
 - `/auth_callback`: Handles the authentication callback.
-- `/secured_route`: A secured route that requires user authentication.
+- `/logout`: Logs out the user and clears the session.
 
-### Example
+### Protecting Routes
 
-Here is an example of how to use the package in your Flask application:
+#### Require Login
 
 ```python
-from flask import Flask, render_template
-from flask_lac import AuthPackage, login_required
+from flask_lac import login_required
 
-app = Flask(__name__)
-auth = AuthPackage(app, auth_service_url="https://auth.luova.club", app_id="your_app_id")
-
-@app.route('/')
-def index():
-    return "Welcome to the Flask LAC example!"
-
-@app.route('/secured')
+@app.route('/dashboard')
 @login_required
-def secured():
-    return render_template('secured.html', username=auth._user._info.username)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+def dashboard():
+    return "This is a protected dashboard."
 ```
 
-### User Authentication
+#### Require Role
 
-The `User` class handles user authentication and information retrieval:
+```python
+from flask_lac.user import role_required
+
+@app.route('/admin')
+@role_required(min_role=10)
+def admin_panel():
+    return "Admin panel."
+```
+
+#### Require Permission
+
+```python
+from flask_lac.user import permission_needed
+
+@app.route('/reports')
+@permission_needed('view_reports')
+def reports():
+    return "Reports page."
+```
+
+### Accessing the Current User
 
 ```python
 from flask_lac.user import User
 
 user = User()
 if user.is_authenticated():
-    print("User is authenticated")
-else:
-    print("User is not authenticated")
+    print(f"Logged in as: {user.username} ({user.email})")
+    print(f"Role: {user.role}")
+    print(f"Permissions: {user.permissions}")
 ```
+
+## API Reference
+
+### AuthPackage
+
+Initializes authentication for your Flask app.
+
+```
+AuthPackage(app, auth_service_url, app_id)
+```
+- `app`: Flask app instance
+- `auth_service_url`: URL of the authentication service
+- `app_id`: Your application ID from the auth service
+
+### User
+
+Represents the current user. Main properties:
+- `username`, `email`, `role`, `permissions`, `display_name`, `profile_pic`
+- `is_authenticated()`: Returns True if the user is logged in
+
+### Decorators
+
+- `login_required`: Require authentication for a route
+- `role_required(min_role, redirect_to=None)`: Require a minimum role
+- `permission_needed(permission)`: Require a specific permission
 
 ## Development
 
-### Publishing new version
+### Running Tests
 
-To publish a new version of the package, use the following commands:
+_Tests are not included in this version. Add your tests in a `tests/` directory._
+
+### Publishing a New Version
 
 ```sh
 bash release.sh --bump <major|minor|patch>
 ```
 
-This will create a new tag and push it to the repository.
+This will bump the version, build, and upload to PyPI.
 
-### License
+## Troubleshooting & FAQ
+
+- **Redis is not running:** The package will fall back to in-memory token storage, which is not recommended for production.
+- **How do I get my app_id?** Register on the authentication service and create a new application.
+- **How do I add permissions or roles?** Use the admin interface of the authentication service.
+
+## License
 
 This project is licensed under the MIT License.

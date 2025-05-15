@@ -237,6 +237,33 @@ def role_required(min_role, redirect_to=None):
         return wrapper
     return decorator
 
+def permission_needed(permission):
+    """
+    Decorator to check if the current user has the required permission.
+
+    Parameters
+    ----------
+    permission : str
+        The permission required to access the decorated function.
+
+    Returns
+    -------
+    function
+        The decorated function.
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            user = User()
+            if not user.is_authenticated():
+                return redirect(url_for("login", next=request.url))
+            user_permissions = user.permissions or []
+            if permission in user_permissions:
+                return func(*args, **kwargs)
+            abort(403, description=f"You do not have the required permission: {permission}")
+        return wrapper
+    return decorator
+
 
 class User:
     def __init__(self):
